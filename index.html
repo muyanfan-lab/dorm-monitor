@@ -1,0 +1,1635 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HC-08 · 宿舍用电安全监控</title>
+<style>
+  :root{
+    color-scheme: dark;
+    --bg:#0a0e13;
+    --card:#121a23;
+    --card2:#0e151d;
+    --line:#1e2a36;
+    --text:#e7eef6;
+    --muted:#8ea1b8;
+    --accent:#2dd4bf;
+    --accent2:#38bdf8;
+    --ok:#34d399;
+    --warn:#fbbf24;
+    --bad:#f87171;
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1100px 560px at 8% -12%, #10313a55, transparent 60%),
+      radial-gradient(900px 520px at 102% -6%, #17255a44, transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font:15px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{
+    position:sticky; top:0; z-index:20;
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    padding:12px 20px;
+    background:#0a0e13cc;
+    backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:650;letter-spacing:.2px}
+  .brand .dot{
+    width:26px;height:26px;border-radius:9px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 0 18px #2dd4bf55;
+  }
+  .brand small{display:block;font-weight:400;font-size:11.5px;color:var(--muted);letter-spacing:.4px}
+  .spacer{flex:1}
+  .pill{
+    display:inline-flex;align-items:center;gap:7px;
+    padding:6px 12px;border-radius:999px;
+    border:1px solid var(--line);background:var(--card2);
+    font-size:13px;color:var(--muted);white-space:nowrap;
+  }
+  .pill i{width:8px;height:8px;border-radius:50%;background:#64748b;display:block}
+  .pill.on{color:var(--ok);border-color:#1f4d3d}
+  .pill.on i{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  .pill.demo{color:var(--warn);border-color:#4d3d1f}
+  .pill.demo i{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+  .pill.err{color:var(--bad);border-color:#4d1f1f}
+  .pill.err i{background:var(--bad)}
+
+  button{
+    font:inherit;font-size:14px;
+    border-radius:11px;border:1px solid var(--line);
+    background:var(--card);color:var(--text);
+    padding:8px 14px;cursor:pointer;
+    transition:.16s ease;
+  }
+  button:hover{border-color:#2c3d4f;background:#16202b}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.42;cursor:not-allowed;transform:none}
+  button.primary{
+    background:linear-gradient(135deg,#2dd4bf,#22a7f0);
+    border-color:transparent;color:#04211f;font-weight:650;
+  }
+  button.primary:hover{filter:brightness(1.07)}
+  button.ghost{background:transparent}
+  button.danger{color:var(--bad);border-color:#4a2424}
+  button.danger:hover{background:#2a1616}
+
+  main{
+    max-width:1180px;margin:0 auto;padding:20px 20px 56px;
+    display:grid;gap:16px;
+    grid-template-columns:minmax(0,1.32fr) minmax(0,1fr);
+    align-items:start;
+  }
+  @media (max-width:960px){
+    main{grid-template-columns:minmax(0,1fr)}
+    .col.right{position:static}
+  }
+
+  .card{
+    background:linear-gradient(180deg,#121a23,#101821);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    box-shadow:0 12px 34px #00000040;
+  }
+  .card h2{
+    margin:0 0 14px;font-size:13px;font-weight:600;
+    color:var(--muted);letter-spacing:.9px;text-transform:uppercase;
+  }
+  .col{display:grid;gap:16px}
+  .col.right{position:sticky;top:74px}
+
+  .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;border-radius:14px}
+  @media (max-width:620px){ .metrics{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .metrics.alarming{animation:alarmPulse 1.4s ease-in-out infinite}
+  @keyframes alarmPulse{
+    0%,100%{box-shadow:0 0 0 0 #f8717100}
+    50%{box-shadow:0 0 0 4px #f8717140}
+  }
+  .metric{
+    background:var(--card2);border:1px solid var(--line);border-radius:13px;
+    padding:12px 14px;position:relative;overflow:hidden;
+  }
+  .metric::after{
+    content:"";position:absolute;inset:auto -20% -60% auto;width:120px;height:120px;
+    background:radial-gradient(circle,var(--tint,#2dd4bf22),transparent 70%);
+    pointer-events:none;
+  }
+  .metric .label{font-size:12px;color:var(--muted);letter-spacing:.5px}
+  .metric .value{
+    font:600 27px/1.25 ui-monospace,"Cascadia Mono",Consolas,monospace;
+    font-variant-numeric:tabular-nums;
+    margin-top:2px;letter-spacing:-.5px;
+  }
+  .metric .unit{font-size:13px;color:var(--muted);margin-left:3px;font-weight:400}
+  .metric .value.na{color:#475569}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .chip{
+    font-size:12.5px;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--line);background:var(--card2);color:var(--muted);
+    display:inline-flex;align-items:center;gap:6px;
+  }
+  .chip b{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+  .chip.good{color:var(--ok);border-color:#1f4d3d}
+  .chip.good b{color:var(--ok)}
+  .chip.bad{color:var(--bad);border-color:#4a2424}
+  .chip.bad b{color:var(--bad)}
+  .chip.warn{color:var(--warn);border-color:#4d3d1f}
+  .chip.warn b{color:var(--warn)}
+
+  .chart-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .seg{display:inline-flex;background:var(--card2);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
+  .seg button{
+    border:0;background:transparent;padding:5px 11px;border-radius:8px;
+    font-size:13px;color:var(--muted);
+  }
+  .seg button:hover{background:transparent;color:var(--text)}
+  .seg button.active{background:#1b2836;color:var(--text);font-weight:600}
+  canvas{width:100%;height:230px;display:block;border-radius:10px}
+  .hint{font-size:12px;color:var(--muted)}
+
+  .cmd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .cmd-grid button{font-size:13px;padding:9px 10px;text-align:left}
+  .cmd-grid button span{display:block;font-size:11px;color:var(--muted);font-weight:400}
+  .send{display:flex;gap:8px;margin-top:10px}
+  input[type=text], input[type=number]{
+    width:100%;font:inherit;font-size:14px;
+    background:var(--card2);border:1px solid var(--line);border-radius:11px;
+    color:var(--text);padding:9px 12px;outline:none;
+  }
+  input[type=text]:focus, input[type=number]:focus{border-color:#2f5c66;box-shadow:0 0 0 3px #2dd4bf1f}
+  input::placeholder{color:#5b6b7d}
+  select{
+    width:100%;font:inherit;font-size:14px;
+    background:var(--card2);border:1px solid var(--line);border-radius:11px;
+    color:var(--text);padding:9px 12px;outline:none;
+  }
+  select:focus{border-color:#2f5c66;box-shadow:0 0 0 3px #2dd4bf1f}
+
+  .log{
+    height:250px;overflow:auto;border:1px solid var(--line);border-radius:11px;
+    background:#080d12;padding:10px 12px;
+    font:12.5px/1.65 ui-monospace,"Cascadia Mono",Consolas,monospace;
+    white-space:pre-wrap;word-break:break-all;
+  }
+  .log .ln{display:block}
+  .log .t{color:#4b5c6e;margin-right:8px}
+  .log .k-status{color:#9fb3c8}
+  .log .k-ok{color:var(--ok)}
+  .log .k-event{color:var(--warn)}
+  .log .k-err{color:var(--bad)}
+  .log .k-diag{color:var(--accent2)}
+  .log .k-sys{color:#6b7f95;font-style:italic}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+  th,td{
+    text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  th{color:var(--muted);font-weight:500;font-size:12px}
+  td{font-variant-numeric:tabular-nums}
+
+  details{border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:var(--card2)}
+  details summary{cursor:pointer;font-size:13px;color:var(--muted)}
+  details .row{display:grid;gap:8px;margin-top:10px}
+  details label{font-size:12px;color:var(--muted)}
+  .tiny{font-size:12px;color:var(--muted);line-height:1.7}
+
+  #banner{
+    max-width:1180px;margin:16px auto 0;padding:12px 16px;
+    border:1px solid #4a2424;background:#1f1315;color:#ffc9c9;
+    border-radius:12px;font-size:13.5px;display:none;
+  }
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(12px);
+    background:#16202b;border:1px solid var(--line);color:var(--text);
+    padding:10px 16px;border-radius:11px;font-size:13.5px;
+    opacity:0;pointer-events:none;transition:.22s ease;z-index:50;
+    box-shadow:0 14px 40px #00000080;max-width:88vw;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .row-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="dot"></div>
+    <div>宿舍用电安全监控
+      <small>HC-08 · BLE UART · Web Bluetooth</small>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="pill" id="pillStatus"><i></i><span id="pillText">未连接</span></div>
+  <button class="primary" id="btnConnect">连接设备</button>
+  <button class="ghost" id="btnSerial">串口模式</button>
+  <button class="ghost" id="btnSound" title="报警提示音">🔊 报警音</button>
+  <button class="ghost" id="btnDemo">演示模式</button>
+  <button class="ghost" id="btnDisconnect" disabled>断开</button>
+</header>
+
+<div id="banner"></div>
+
+<main>
+  <!-- 左列 -->
+  <div class="col">
+    <section class="card">
+      <h2>实时数据</h2>
+      <div class="metrics" id="metrics">
+        <div class="metric" style="--tint:#2dd4bf33">
+          <div class="label">电压</div>
+          <div class="value na" id="mVoltage">--</div>
+          <div class="unit" style="margin:0">V</div>
+        </div>
+        <div class="metric" style="--tint:#a78bfa33">
+          <div class="label">电流</div>
+          <div class="value na" id="mCurrent">--</div>
+          <div class="unit" style="margin:0">A</div>
+        </div>
+        <div class="metric" style="--tint:#34d39933">
+          <div class="label">功率</div>
+          <div class="value na" id="mPower">--</div>
+          <div class="unit" style="margin:0">W</div>
+        </div>
+        <div class="metric" style="--tint:#fbbf2433">
+          <div class="label">温度</div>
+          <div class="value na" id="mTemp">--</div>
+          <div class="unit" style="margin:0">°C</div>
+        </div>
+      </div>
+
+      <div class="chips">
+        <span class="chip" id="cMode">模式 <b>--</b></span>
+        <span class="chip" id="cRelay">输出 <b>--</b></span>
+        <span class="chip" id="cInput">输入 <b>--</b></span>
+        <span class="chip" id="cAlarm">告警 <b>--</b></span>
+        <span class="chip" id="cLink">最后接收 <b>--</b></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="chart-head">
+        <h2 style="margin:0;flex:1">趋势（最近 2 分钟）</h2>
+        <div class="seg" id="seg">
+          <button data-k="v">电压</button>
+          <button data-k="i">电流</button>
+          <button data-k="p" class="active">功率</button>
+          <button data-k="t">温度</button>
+        </div>
+      </div>
+      <canvas id="chart"></canvas>
+      <div class="row-inline" style="margin-top:8px">
+        <span class="hint" id="chartInfo">等待数据…</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- 右列 -->
+  <div class="col right">
+    <section class="card">
+      <h2>命令</h2>
+      <div class="cmd-grid">
+        <button data-cmd="STATUS">查询状态<span>STATUS</span></button>
+        <button data-cmd="PING">连通测试<span>PING</span></button>
+        <button data-cmd="DIAG">诊断计数<span>DIAG</span></button>
+        <button data-cmd="HISTORY">读历史<span>HISTORY</span></button>
+        <button data-cmd="MODE STUDY">日间模式<span>MODE STUDY</span></button>
+        <button data-cmd="MODE SLEEP">睡眠模式<span>MODE SLEEP</span></button>
+        <button data-cmd="RELAY ON">接通输出<span>RELAY ON</span></button>
+        <button data-cmd="RELAY OFF">断开输出<span>RELAY OFF</span></button>
+        <button data-cmd="STREAM OFF">停止推送<span>STREAM OFF</span></button>
+        <button data-cmd="STREAM ON">恢复推送<span>STREAM ON</span></button>
+        <button data-cmd="CLEAR_ALARM">清除告警<span>CLEAR_ALARM</span></button>
+        <button data-cmd="CLEAR_HISTORY" class="danger">清空历史<span>CLEAR_HISTORY</span></button>
+      </div>
+      <div class="send">
+        <input type="text" id="cmdInput" placeholder="自定义命令，回车发送（例如 [HISTORY]）" autocomplete="off">
+        <button class="primary" id="btnSend" style="white-space:nowrap">发送</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row-inline" style="justify-content:space-between;margin-bottom:10px">
+        <h2 style="margin:0">日志</h2>
+        <div class="row-inline">
+          <label class="hint"><input type="checkbox" id="autoScroll" checked> 自动滚动</label>
+          <button class="ghost" id="btnClearLog" style="padding:4px 9px;font-size:12px">清空</button>
+        </div>
+      </div>
+      <div class="log" id="log"></div>
+    </section>
+
+    <section class="card">
+      <h2>历史记录</h2>
+      <table>
+        <thead><tr><th style="width:34px">#</th><th>事件</th><th style="width:142px">时刻</th></tr></thead>
+        <tbody id="historyBody"><tr><td colspan="3" class="hint">发送 HISTORY 读取</td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <details>
+        <summary>高级设置 · 服务 / 特征 UUID</summary>
+        <div class="row">
+          <label>Service UUID</label>
+          <input type="text" id="uuidService" spellcheck="false">
+          <label>Characteristic UUID</label>
+          <input type="text" id="uuidChar" spellcheck="false">
+          <span class="tiny">HC-08 / HM-10 通常是 <code>FFE0</code> + <code>FFE1</code>。连不上时先用任意 BLE 扫描 App 确认模块实际广播的 UUID。</span>
+
+          <label class="row-inline" style="gap:6px">
+            <input type="checkbox" id="autoReconnect" checked> 掉线后自动重连（最多 5 次）
+          </label>
+          <label class="row-inline" style="gap:6px">
+            <input type="checkbox" id="filterName"> 设备列表只显示名字含 <code>HC-08</code> 的
+          </label>
+          <span class="tiny">勾了过滤却看不到设备，取消勾选再连——有些模块被改过名。</span>
+          <label>串口波特率（HC-05 配对成虚拟 COM 口时用）</label>
+          <select id="baudSel">
+            <option value="9600">9600</option>
+            <option value="19200">19200</option>
+            <option value="38400" selected>38400</option>
+            <option value="57600">57600</option>
+            <option value="115200">115200</option>
+          </select>
+          <span class="tiny">必须和模块的数据口波特率一致。打开串口前请先关掉串口助手之类的程序，否则端口会被占用。</span>
+
+          <label>过流阈值（A）</label>
+          <input type="number" id="limCurrent" step="0.1" min="0.1" value="1.5">
+          <label>超温阈值（℃）</label>
+          <input type="number" id="limTemp" step="1" min="0" value="30">
+          <label>忘拔：功率上限（W）</label>
+          <input type="number" id="limPower" step="0.5" min="0" value="5">
+          <label>忘拔：持续多久算忘拔（秒）</label>
+          <input type="number" id="limIdle" step="10" min="5" value="30">
+          <span class="tiny">
+            这四个阈值<b>只用于网页判断要不要响</b>，不会下发给板子；板子自己的阈值在 <code>main.c</code> 里（当前 <code>DEMO_MODE=1</code>：过流 1.5 A、超温 30 ℃、忘拔 30 秒；功率达到 0.5 W 才开始计时，低于 0.35 W 取消）。
+          </span>
+        </div>
+      </details>
+      <p class="tiny" style="margin:12px 0 0">
+        <b>HC-08：</b>点“连接设备”→ 选 <code>HC-08</code> 即可。BLE 不需要配对、也不用输密码。<br>
+        需要 Chrome / Edge（桌面或安卓）。iOS 的 Safari 不支持 Web Bluetooth，需改用 Bluefy 等浏览器。<br>
+        <b>串口模式</b>是备用通道（HC-05 配对成电脑虚拟 COM 口），只在桌面版 Chrome / Edge 可用。<br>
+        页面必须运行在 <code>https://</code> 或 <code>localhost</code> 下，直接双击打开 <code>file://</code> 可能拿不到设备权限。
+      </p>
+    </section>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var DEFAULT_SERVICE = '0000ffe0-0000-1000-8000-00805f9b34fb';
+  var DEFAULT_CHAR    = '0000ffe1-0000-1000-8000-00805f9b34fb';
+
+  var WINDOW_MS  = 120000;   // 曲线时间窗
+  var MAX_POINTS = 900;      // 最多保留的点数
+  var SILENT_MS  = 20000;    // 超过这么久没数据就提示
+
+  var SERIES = {
+    v: { name: '电压', unit: 'V',  color: '#2dd4bf', dec: 2, get: function (p) { return p.v; } },
+    i: { name: '电流', unit: 'A',  color: '#a78bfa', dec: 2, get: function (p) { return p.i; } },
+    p: { name: '功率', unit: 'W',  color: '#34d399', dec: 2, get: function (p) { return p.p; } },
+    t: { name: '温度', unit: '°C', color: '#fbbf24', dec: 1, get: function (p) { return p.temp; } }
+  };
+
+  var ALARM_CN = {
+    'OVERCURRENT': '过流',
+    'OVER TEMP': '超温',
+    'FORGOT LOAD': '忘拔负载',
+    'POWER LOST': '输入断电',
+    'POWER BACK': '输入恢复',
+    'NONE': '无'
+  };
+
+  var state = {
+    device: null,
+    server: null,
+    char: null,
+    connected: false,
+    mode: null,          // 'ble' | 'serial' | 'demo'
+    deviceMode: null,    // 板子上报的 'STUDY' | 'SLEEP'，用来跟随物理按键切换
+    manualDisconnect: false,
+    reconnectTries: 0,
+    reconnectTimer: null,
+    port: null,
+    reader: null,
+    reading: false,
+    readLoop: null,
+    demo: false,
+    demoTimer: null,
+    demoN: 0,
+    rx: '',
+    lastRx: 0,
+    points: [],
+    seriesKey: 'p',
+    history: [],
+    currentAlarm: 'NONE',
+    silent: false
+  };
+
+  /* ---------------- 基础 UI ---------------- */
+
+  var toastTimer = null;
+  function toast(msg) {
+    var el = $('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, 2600);
+  }
+
+  function setPill(kind, text) {
+    var pill = $('pillStatus');
+    pill.className = 'pill' + (kind ? ' ' + kind : '');
+    $('pillText').textContent = text;
+  }
+
+  function setConnectedUI(on) {
+    state.connected = on;
+    $('btnConnect').disabled = on;
+    $('btnDisconnect').disabled = !on;
+    $('btnConnect').textContent = on ? '已连接' : '连接设备';
+    if (!on) {
+      setPill('', '未连接');
+      $('cLink').className = 'chip';
+      $('cLink').innerHTML = '最后接收 <b>--</b>';
+    }
+  }
+
+  function logLine(text, kind) {
+    if (state.silent) return;
+    var box = $('log');
+    var ln = document.createElement('span');
+    ln.className = 'ln';
+    var t = document.createElement('span');
+    t.className = 't';
+    t.textContent = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    var body = document.createElement('span');
+    body.className = 'k-' + (kind || 'status');
+    body.textContent = text;
+    ln.appendChild(t);
+    ln.appendChild(body);
+    box.appendChild(ln);
+
+    while (box.childNodes.length > 400) box.removeChild(box.firstChild);
+    if ($('autoScroll').checked) box.scrollTop = box.scrollHeight;
+  }
+
+  /* ---------------- UUID ---------------- */
+
+  function normUuid(s) {
+    s = String(s || '').trim().toLowerCase();
+    if (!s) return '';
+    if (/^[0-9a-f]{4}$/.test(s)) return '0000' + s + '-0000-1000-8000-00805f9b34fb';
+    if (/^[0-9a-f]{8}$/.test(s)) return s + '-0000-1000-8000-00805f9b34fb';
+    return s;
+  }
+
+  function loadUuids() {
+    var svc = 'FFE0', chr = 'FFE1';
+    try {
+      svc = localStorage.getItem('hc08.svc') || svc;
+      chr = localStorage.getItem('hc08.chr') || chr;
+    } catch (e) { /* file:// 下可能禁用 localStorage，忽略 */ }
+    $('uuidService').value = svc;
+    $('uuidChar').value = chr;
+  }
+
+  function saveUuids() {
+    try {
+      localStorage.setItem('hc08.svc', $('uuidService').value.trim());
+      localStorage.setItem('hc08.chr', $('uuidChar').value.trim());
+    } catch (e) { /* 忽略 */ }
+  }
+
+  function loadOptions() {
+    try {
+      $('autoReconnect').checked = (localStorage.getItem('hc08.autoReconnect') || '1') !== '0';
+      $('filterName').checked = (localStorage.getItem('hc08.filterName') || '0') === '1';
+    } catch (e) { /* 忽略 */ }
+  }
+
+  function saveOptions() {
+    try {
+      localStorage.setItem('hc08.autoReconnect', $('autoReconnect').checked ? '1' : '0');
+      localStorage.setItem('hc08.filterName', $('filterName').checked ? '1' : '0');
+    } catch (e) { /* 忽略 */ }
+  }
+
+  /* ---------------- 连接 ---------------- */
+
+  var RECONNECT_MAX = 5;
+  var RECONNECT_DELAY_MS = 2000;
+
+  async function connect() {
+    if (!navigator.bluetooth) {
+      toast('这个浏览器不支持 Web Bluetooth，请用 Chrome / Edge');
+      return;
+    }
+
+    var svc = normUuid($('uuidService').value);
+    saveUuids();
+
+    try {
+      setPill('', '正在连接…');
+      logLine('请求蓝牙设备…', 'sys');
+
+      /*
+       * HC-08 的广播包里不一定带 FFE0，所以默认用 acceptAllDevices 列全部设备。
+       * 勾了“只列 HC-08”就按名字过滤，列表会干净很多。
+       */
+      var opts = { optionalServices: [svc] };
+      if ($('filterName').checked) {
+        opts.filters = [{ namePrefix: 'HC-08' }];
+      } else {
+        opts.acceptAllDevices = true;
+      }
+
+      var device = await navigator.bluetooth.requestDevice(opts);
+
+      state.manualDisconnect = false;
+      state.reconnectTries = 0;
+      state.device = device;
+      device.addEventListener('gattserverdisconnected', onDisconnected);
+
+      logLine('已选择：' + (device.name || '(未知设备)'), 'sys');
+      await attachDevice(device);
+
+      // 主动握一次手
+      setTimeout(function () { sendCmd('PING'); }, 350);
+      setTimeout(function () { sendCmd('STATUS'); }, 650);
+    } catch (err) {
+      if (err && err.name === 'NotFoundError') {
+        setPill('', '未连接');
+        logLine('已取消选择', 'sys');
+        return;
+      }
+      setPill('err', '连接失败');
+      logLine('连接失败：' + (err && err.message ? err.message : err), 'err');
+      toast('连接失败，看右下角日志');
+    }
+  }
+
+  /* 连 GATT、找服务/特征、订阅通知。首次连接和自动重连都走这里。 */
+  async function attachDevice(device) {
+    var svc = normUuid($('uuidService').value);
+    var chr = normUuid($('uuidChar').value);
+
+    setPill('', '正在连接…');
+    logLine('连接 GATT…', 'sys');
+    var server = await device.gatt.connect();
+    state.server = server;
+
+    logLine('查找服务 ' + svc + ' …', 'sys');
+    var service = await server.getPrimaryService(svc);
+
+    var ch;
+    try {
+      ch = await service.getCharacteristic(chr);
+    } catch (e) {
+      // 有些固件 notify 和 write 是两个不同的特征
+      var all = await service.getCharacteristics();
+      ch = all[0];
+      logLine('找不到 ' + chr + '，改用服务下的第一个特征 ' + ch.uuid, 'sys');
+    }
+    state.char = ch;
+
+    if (ch.properties.notify || ch.properties.indicate) {
+      try { ch.removeEventListener('characteristicvaluechanged', onValue); } catch (e) {}
+      await ch.startNotifications();
+      ch.addEventListener('characteristicvaluechanged', onValue);
+      logLine('已订阅通知 ' + ch.uuid, 'sys');
+    } else {
+      logLine('该特征不支持 notify，只能发不能收', 'err');
+    }
+
+    setConnectedUI(true);
+    setPill('on', '已连接：' + (device.name || 'HC-08'));
+    logLine('连接成功，开始接收', 'ok');
+  }
+
+  function onDisconnected() {
+    setConnectedUI(false);
+    setPill('err', '已断开');
+    logLine('设备已断开', 'err');
+
+    if (state.manualDisconnect || !$('autoReconnect').checked) {
+      toast('蓝牙已断开');
+      return;
+    }
+    scheduleReconnect();
+  }
+
+  /* BLE 掉线很常见，自动重连几次比手动点强 */
+  function scheduleReconnect() {
+    if (state.reconnectTimer) return;
+    if (state.reconnectTries >= RECONNECT_MAX || !state.device) {
+      setPill('err', '已断开');
+      toast('自动重连失败，请重新连接');
+      return;
+    }
+
+    state.reconnectTries++;
+    setPill('', '重连中 ' + state.reconnectTries + '/' + RECONNECT_MAX + '…');
+    logLine('第 ' + state.reconnectTries + ' 次自动重连…', 'sys');
+
+    state.reconnectTimer = setTimeout(async function () {
+      state.reconnectTimer = null;
+      if (state.manualDisconnect) return;
+      try {
+        await attachDevice(state.device);
+        state.reconnectTries = 0;
+        setTimeout(function () { sendCmd('STATUS'); }, 300);
+      } catch (e) {
+        logLine('重连失败：' + (e && e.message ? e.message : e), 'err');
+        scheduleReconnect();
+      }
+    }, RECONNECT_DELAY_MS);
+  }
+
+  async function disconnect() {
+    state.manualDisconnect = true;
+    if (state.reconnectTimer) {
+      clearTimeout(state.reconnectTimer);
+      state.reconnectTimer = null;
+    }
+    stopDemo();
+    await closeSerial();
+    try {
+      if (state.char) {
+        try { await state.char.stopNotifications(); } catch (e) {}
+        state.char.removeEventListener('characteristicvaluechanged', onValue);
+      }
+      if (state.device && state.device.gatt.connected) state.device.gatt.disconnect();
+    } catch (e) {
+      logLine('断开时出错：' + e.message, 'err');
+    }
+    state.char = null;
+    state.server = null;
+    state.device = null;
+    state.mode = null;
+    state.deviceMode = null;   // 重连后重新同步板子的模式
+    state.reconnectTries = 0;
+    setConnectedUI(false);
+    logLine('已断开', 'sys');
+  }
+
+  /* ---------------- 串口模式（Web Serial） ----------------
+   * 用途：HC-05 和电脑配对后会生成一个虚拟 COM 口，
+   * 桌面版 Chrome / Edge 可以直接打开它，不必等 HC-08 到货。
+   */
+
+  function loadBaud() {
+    var b = '38400';
+    try { b = localStorage.getItem('hc08.baud') || b; } catch (e) {}
+    var sel = $('baudSel');
+    sel.value = b;
+    if (sel.value !== b) sel.value = '38400';   // 存了个不存在的档位就退回默认
+  }
+
+  function saveBaud() {
+    try { localStorage.setItem('hc08.baud', $('baudSel').value); } catch (e) {}
+  }
+
+  async function connectSerial() {
+    if (!('serial' in navigator)) {
+      toast('这个浏览器不支持 Web Serial，请用桌面版 Chrome / Edge');
+      return;
+    }
+    if (state.char) {
+      toast('先断开蓝牙，再连串口');
+      return;
+    }
+    if (state.port) {
+      toast('串口已经连着了');
+      return;
+    }
+
+    var baud = parseInt($('baudSel').value, 10) || 38400;
+    try {
+      setPill('', '选择串口…');
+      var port = await navigator.serial.requestPort();
+      await port.open({ baudRate: baud, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' });
+
+      state.port = port;
+      state.mode = 'serial';
+      state.reading = true;
+      state.lastRx = Date.now();
+
+      setConnectedUI(true);
+      setPill('on', '串口 · ' + baud);
+      logLine('串口已打开：' + baud + ' 8N1', 'ok');
+
+      state.readLoop = readSerial(port);
+      state.readLoop.catch(function (err) {
+        logLine('串口循环异常：' + err.message, 'err');
+      });
+      setTimeout(function () { sendCmd('PING'); }, 300);
+    } catch (err) {
+      if (err && err.name === 'NotFoundError') {
+        setPill('', '未连接');
+        logLine('已取消选择串口', 'sys');
+        return;
+      }
+      setPill('err', '串口打开失败');
+      logLine('串口打开失败：' + (err && err.message ? err.message : err), 'err');
+      toast('打不开串口，常见原因是端口被串口助手占用');
+    }
+  }
+
+  async function readSerial(port) {
+    var dec = new TextDecoder();
+    while (port.readable && state.reading) {
+      var reader = port.readable.getReader();
+      state.reader = reader;
+      try {
+        while (true) {
+          var res = await reader.read();
+          if (res.done) break;
+          if (res.value) feedText(dec.decode(res.value, { stream: true }));
+        }
+      } catch (e) {
+        if (state.reading) logLine('串口读取中断：' + e.message, 'err');
+      } finally {
+        try { reader.releaseLock(); } catch (e2) {}
+        if (state.reader === reader) state.reader = null;
+      }
+    }
+  }
+
+  async function closeSerial() {
+    if (!state.port) return;
+    state.reading = false;
+    if (state.reader) {
+      try { await state.reader.cancel(); } catch (e) {}
+    }
+    // 等读循环自己把 reader 释放掉，否则 port.close() 会因为还被锁住而失败
+    if (state.readLoop) {
+      try { await state.readLoop; } catch (e) {}
+      state.readLoop = null;
+    }
+    try { await state.port.close(); } catch (e) {}
+    state.port = null;
+    state.reader = null;
+    state.mode = null;
+    logLine('串口已关闭', 'sys');
+  }
+
+  /* ---------------- 收数据 ---------------- */
+
+  var decoder = new TextDecoder('utf-8');
+
+  /* 把收到的字节流按行切开 —— BLE 分包、串口分块都走这里 */
+  function feedText(text) {
+    state.rx += text;
+    var idx;
+    while ((idx = state.rx.indexOf('\n')) >= 0) {
+      var line = state.rx.slice(0, idx).replace(/\r$/, '').trim();
+      state.rx = state.rx.slice(idx + 1);
+      if (line) handleLine(line);
+    }
+    if (state.rx.length > 4096) state.rx = '';   // 无换行的垃圾数据，别无限涨
+  }
+
+  function onValue(event) {
+    feedText(decoder.decode(event.target.value, { stream: true }));
+  }
+
+  function kindOf(line) {
+    if (line.indexOf('ERROR') === 0) return 'err';
+    if (line.indexOf('OK,') === 0 || line.indexOf('PONG') === 0) return 'ok';
+    if (line.indexOf('EVENT') === 0) return 'event';
+    if (line.indexOf('DIAG') === 0) return 'diag';
+    return 'status';
+  }
+
+  function handleLine(line) {
+    state.lastRx = Date.now();
+    logLine(line, kindOf(line));
+
+    if (line.indexOf('STATUS,') === 0) parseStatus(line);
+    else if (line.indexOf('EVENT,') === 0) parseEvent(line);
+    else if (line.indexOf('HISTORY,') === 0) {
+      state.history = [];
+      renderHistory();
+    } else if (line.indexOf('DIAG,') === 0) {
+      logLine('↑ 诊断：OVR/FE 一直增长说明串口参数不对，不是蓝牙断', 'sys');
+    }
+  }
+
+  function parseStatus(line, when) {
+    var o = {};
+    var parts = line.split(',');
+    for (var i = 1; i < parts.length; i++) {
+      var p = parts[i].indexOf('=');
+      if (p > 0) o[parts[i].slice(0, p)] = parts[i].slice(p + 1);
+    }
+
+    var v = parseFloat(o.V), cur = parseFloat(o.I), pw = parseFloat(o.P), tp = parseFloat(o.T);
+    if (!isFinite(v) || !isFinite(cur) || !isFinite(pw) || !isFinite(tp)) return;
+
+    setMetric('mVoltage', v, 2);
+    setMetric('mCurrent', cur, 2);
+    setMetric('mPower', pw, 2);
+    setMetric('mTemp', tp, 1);
+
+    var relay = o.RELAY === '1';
+    var input = o.INPUT === '1';
+    var mode = o.MODE === 'SLEEP' ? '睡眠' : '日间';
+    var alarm = o.ALARM || 'NONE';
+
+    chip('cMode', '模式', mode, mode === '睡眠' ? 'warn' : 'good');
+    chip('cRelay', '输出', relay ? '已接通' : '已断开', relay ? 'good' : '');
+    chip('cInput', '输入', input ? '有电' : '断电', input ? 'good' : 'bad');
+    chip('cLink', '最后接收', '刚刚', 'good');
+
+    /*
+     * 板子上按物理按键切模式时，网页也要跟着静音 / 恢复。
+     * 只在“模式发生变化”时动一次，这样你手动点 🔊 不会被下一帧覆盖。
+     */
+    var modeRaw = (o.MODE === 'SLEEP') ? 'SLEEP' : 'STUDY';
+    if (state.deviceMode !== modeRaw) {
+      state.deviceMode = modeRaw;
+      if (modeRaw === 'SLEEP') acknowledgeAlarm('device');
+      else restoreAlarm('device');
+    }
+
+    /*
+     * 警报跟“实时数据是否还满足条件”走，而不是跟板子的 ALARM 字段走：
+     * 板子的 g_alarm 是锁存的（要发 CLEAR_ALARM 才清），所以只看它的话，
+     * 数值早就恢复正常了还会一直响。
+     */
+    state.currentAlarm = alarm;
+    updateAlarmState(evaluateAlarm(cur, pw, tp));
+
+    state.points.push({ t: when || Date.now(), v: v, i: cur, p: pw, temp: tp });
+    if (state.points.length > MAX_POINTS) state.points.shift();
+
+    drawChart();
+  }
+
+  function parseEvent(line) {
+    var o = {};
+    var parts = line.split(',');
+    for (var i = 1; i < parts.length; i++) {
+      var p = parts[i].indexOf('=');
+      if (p > 0) o[parts[i].slice(0, p)] = parts[i].slice(p + 1);
+    }
+    if (o.INDEX) {
+      // 新固件发送事件发生时的 YY-MM-DD HH:MM，保留文本和两位年份。
+      state.history.push({ index: +o.INDEX, type: o.TYPE || '?', time: o.TIME || '--/--/-- --:--' });
+      renderHistory();
+    } else {
+      // 实时事件才有声音；HISTORY 回放出来的旧记录不该响
+      alarmSound(o.TYPE);
+    }
+  }
+
+  function setMetric(id, val, dec) {
+    var el = $(id);
+    el.classList.remove('na');
+    el.textContent = val.toFixed(dec);
+  }
+
+  function chip(id, label, value, kind) {
+    var el = $(id);
+    el.className = 'chip' + (kind ? ' ' + kind : '');
+    el.innerHTML = label + ' <b></b>';
+    el.querySelector('b').textContent = value;
+  }
+
+  function renderHistory() {
+    var body = $('historyBody');
+    body.innerHTML = '';
+    if (!state.history.length) {
+      body.innerHTML = '<tr><td colspan="3" class="hint">暂无记录</td></tr>';
+      return;
+    }
+    state.history.slice().reverse().forEach(function (h) {
+      var tr = document.createElement('tr');
+      var td1 = document.createElement('td'); td1.textContent = h.index;
+      var td2 = document.createElement('td');
+      td2.textContent = (ALARM_CN[h.type] || h.type);
+      var td3 = document.createElement('td'); td3.textContent = fmtEventTime(h.time);
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      body.appendChild(tr);
+    });
+  }
+
+  function fmtEventTime(value) {
+    var text = String(value == null ? '' : value);
+    var fullDate = /^(\d{2})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]) ((?:[01]\d|2[0-3]):[0-5]\d)$/.exec(text);
+    if (fullDate) {
+      var monthDays = new Date(Date.UTC(2000 + Number(fullDate[1]), Number(fullDate[2]), 0)).getUTCDate();
+      if (Number(fullDate[3]) > monthDays) return '未校时';
+      return fullDate[1] + '年' + fullDate[2] + '月' + fullDate[3] + '日 ' + fullDate[4];
+    }
+    // 兼容之前只发送年月的记录，不推测缺失的日。
+    var calendar = /^(\d{2})-(0[1-9]|1[0-2]) ((?:[01]\d|2[0-3]):[0-5]\d)$/.exec(text);
+    if (calendar) return calendar[1] + '年' + calendar[2] + '月 ' + calendar[3];
+    // 兼容旧固件，但界面统一隐藏秒数。
+    if (/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(text)) return text.slice(0, 5);
+    if (/^\d+$/.test(text)) return '运行 ' + fmtUptime(Number(text)); // 兼容旧固件
+    return '未校时';
+  }
+
+  function fmtUptime(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600) % 100;
+    var m = Math.floor(sec / 60) % 60;
+    return pad(h) + ':' + pad(m);
+  }
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  /* ---------------- 发命令 ---------------- */
+
+  async function sendCmd(text) {
+    text = String(text || '').trim();
+    if (!text) return;
+
+    /* 睡眠模式静音、日间模式恢复；其它命令不动声音 */
+    if (text === 'MODE SLEEP') acknowledgeAlarm();
+    else if (text === 'MODE STUDY') restoreAlarm();
+
+    if (state.demo) {
+      logLine('→ ' + text, 'sys');
+      demoReply(text);
+      return;
+    }
+
+    if (text === 'CLEAR_HISTORY') {
+      state.history = [];
+      renderHistory();
+    }
+
+    if (state.mode === 'serial' && state.port) {
+      try {
+        var w = state.port.writable.getWriter();
+        await w.write(new TextEncoder().encode(text + '\r\n'));
+        w.releaseLock();
+        logLine('→ ' + text, 'sys');
+      } catch (e) {
+        logLine('串口发送失败：' + e.message, 'err');
+        toast('发送失败');
+      }
+      return;
+    }
+
+    if (!state.char) {
+      toast('还没连接设备');
+      return;
+    }
+
+    try {
+      var data = new TextEncoder().encode(text + '\r\n');
+      var ch = state.char;
+      if (ch.properties.writeWithoutResponse && !ch.properties.write) {
+        await ch.writeValueWithoutResponse(data);
+      } else {
+        await ch.writeValue(data);
+      }
+      logLine('→ ' + text, 'sys');
+    } catch (e) {
+      logLine('发送失败：' + e.message, 'err');
+      toast('发送失败');
+    }
+  }
+
+  /* ---------------- 折线图 ---------------- */
+
+  var canvas = $('chart');
+  var ctx = canvas.getContext('2d');
+
+  function drawChart() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = canvas.clientWidth || 600;
+    var h = canvas.clientHeight || 230;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    var s = SERIES[state.seriesKey];
+    var now = Date.now();
+    var pts = state.points.filter(function (p) { return now - p.t <= WINDOW_MS; });
+
+    var padL = 46, padR = 14, padT = 12, padB = 22;
+    var plotW = Math.max(10, w - padL - padR);
+    var plotH = Math.max(10, h - padT - padB);
+
+    ctx.font = '11px ui-monospace, Consolas, monospace';
+    ctx.lineWidth = 1;
+
+    if (!pts.length) {
+      ctx.fillStyle = '#42566b';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('等待数据…', w / 2, h / 2);
+      $('chartInfo').textContent = '等待数据…';
+      return;
+    }
+
+    var min = Infinity, max = -Infinity;
+    for (var i = 0; i < pts.length; i++) {
+      var val = s.get(pts[i]);
+      if (val < min) min = val;
+      if (val > max) max = val;
+    }
+    if (!isFinite(min) || !isFinite(max)) { min = 0; max = 1; }
+    if (max - min < 1e-6) { min -= 0.5; max += 0.5; }
+    var padv = (max - min) * 0.18;
+    min -= padv; max += padv;
+
+    var yOf = function (v) { return padT + plotH - ((v - min) / (max - min)) * plotH; };
+    var xOf = function (t) { return padL + plotW - ((now - t) / WINDOW_MS) * plotW; };
+
+    // 横向网格 + Y 轴刻度
+    ctx.strokeStyle = '#1b2530';
+    ctx.fillStyle = '#7f93aa';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (var k = 0; k <= 4; k++) {
+      var y = padT + (plotH * k) / 4;
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(padL + plotW, y);
+      ctx.stroke();
+      var tv = max - ((max - min) * k) / 4;
+      ctx.fillText(tv.toFixed(s.dec), padL - 8, y);
+    }
+
+    // X 轴时间刻度
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (var j = 0; j <= 4; j++) {
+      var secAgo = 120 - j * 30;
+      var x = padL + (plotW * j) / 4;
+      ctx.fillText(secAgo === 0 ? '现在' : '-' + secAgo + 's', x, padT + plotH + 6);
+    }
+
+    // 面积
+    var grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+    grad.addColorStop(0, s.color + '44');
+    grad.addColorStop(1, s.color + '00');
+    ctx.beginPath();
+    ctx.moveTo(xOf(pts[0].t), padT + plotH);
+    for (var m = 0; m < pts.length; m++) ctx.lineTo(xOf(pts[m].t), yOf(s.get(pts[m])));
+    ctx.lineTo(xOf(pts[pts.length - 1].t), padT + plotH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // 折线
+    ctx.beginPath();
+    for (var n = 0; n < pts.length; n++) {
+      var px = xOf(pts[n].t), py = yOf(s.get(pts[n]));
+      if (n === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // 最后一个点
+    var last = pts[pts.length - 1];
+    var lx = xOf(last.t), ly = yOf(s.get(last));
+    ctx.beginPath();
+    ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+    ctx.fillStyle = s.color;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(lx, ly, 8, 0, Math.PI * 2);
+    ctx.strokeStyle = s.color + '66';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    $('chartInfo').textContent = s.name + ' · 当前 ' + s.get(last).toFixed(s.dec) + ' ' + s.unit +
+      ' · ' + pts.length + ' 个点';
+  }
+
+  /* ---------------- 演示模式 ---------------- */
+
+  var demoState = { v: 5.02, i: 0.12, p: 0.60, t: 23.4, relay: 1, input: 1, mode: 'STUDY', alarm: 'NONE' };
+
+  /* 先铺 2 分钟的假数据，曲线不会是空的 */
+  function seedDemo() {
+    state.silent = true;
+    var now = Date.now();
+    var v = 5.02, cur = 0.12, tp = 23.4;
+    for (var i = 39; i >= 0; i--) {
+      v += (Math.random() - 0.5) * 0.05;
+      cur += (Math.random() - 0.5) * 0.03;
+      tp += (Math.random() - 0.5) * 0.1;
+      var pw = v * cur;
+      parseStatus('STATUS,V=' + v.toFixed(2) + ',I=' + cur.toFixed(2) +
+        ',P=' + pw.toFixed(2) + ',T=' + tp.toFixed(1) +
+        ',MODE=STUDY,RELAY=1,INPUT=1,ALARM=NONE', now - i * 3000);
+    }
+    state.silent = false;
+    drawChart();
+  }
+
+  function startDemo() {
+    stopDemo();
+    state.demo = true;
+    state.mode = 'demo';
+    state.lastRx = Date.now();
+    $('btnDemo').textContent = '停止演示';
+    setPill('demo', '演示模式（无硬件）');
+    $('btnConnect').disabled = true;
+    $('btnDisconnect').disabled = false;
+    logLine('演示模式：下面这些数据是本地生成的，用来预览界面', 'sys');
+    demoState = { v: 5.02, i: 0.12, p: 0.60, t: 23.4, relay: 1, input: 1, mode: 'STUDY', alarm: 'NONE' };
+    state.demoN = 0;
+    seedDemo();
+    state.demoTimer = setInterval(demoTick, 1000);
+    demoEmitStatus();
+  }
+
+  function stopDemo() {
+    if (state.demoTimer) clearInterval(state.demoTimer);
+    state.demoTimer = null;
+    if (state.demo) {
+      state.demo = false;
+      state.mode = null;
+      $('btnDemo').textContent = '演示模式';
+      $('btnConnect').disabled = false;
+      setPill('', '未连接');
+      logLine('演示结束', 'sys');
+    }
+  }
+
+  function demoClamp() {
+    demoState.v = Math.max(4.7, Math.min(5.2, demoState.v));
+    demoState.i = Math.max(0, Math.min(2.6, demoState.i));
+    demoState.t = Math.max(20, Math.min(60, demoState.t));
+    demoState.p = demoState.v * demoState.i;
+  }
+
+  function demoTick() {
+    state.demoN++;
+    demoState.v += (Math.random() - 0.5) * 0.05;
+    demoState.i += (Math.random() - 0.5) * 0.04;
+    demoState.t += (Math.random() - 0.5) * 0.12;
+
+    // 每 23 秒来一次过流，演示告警联动
+    if (state.demoN % 23 === 0) {
+      demoState.i = 1.8;
+      demoState.alarm = 'OVERCURRENT';
+      demoState.relay = 0;
+      demoEmitEvent('OVERCURRENT');
+    } else if (state.demoN % 23 === 4) {
+      demoState.i = 0.15;
+      demoState.alarm = 'NONE';
+      demoState.relay = 1;
+    }
+    // 偶尔拔一下负载
+    if (state.demoN % 37 === 0) {
+      demoState.input = 0;
+      demoState.i = 0;
+      demoEmitEvent('POWER LOST');
+      demoState.relay = 0;
+    } else if (state.demoN % 37 === 6) {
+      demoState.input = 1;
+      demoEmitEvent('POWER RESTORED');
+      demoState.relay = 1;
+    }
+
+    demoClamp();
+    demoEmitStatus();
+  }
+
+  function demoEmitStatus() {
+    handleLine('STATUS,V=' + demoState.v.toFixed(2) +
+      ',I=' + demoState.i.toFixed(2) +
+      ',P=' + demoState.p.toFixed(2) +
+      ',T=' + demoState.t.toFixed(1) +
+      ',MODE=' + demoState.mode +
+      ',RELAY=' + demoState.relay +
+      ',INPUT=' + demoState.input +
+      ',ALARM=' + demoState.alarm);
+  }
+
+  function demoEventTime(agoMs) {
+    var date = new Date(Date.now() - (agoMs || 0));
+    return pad(date.getFullYear() % 100) + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + ' ' +
+      pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+
+  function demoEmitEvent(type) {
+    handleLine('EVENT,TYPE=' + type + ',TIME=' + demoEventTime(0));
+  }
+
+  function demoReply(cmd) {
+    setTimeout(function () {
+      var up = state.demoN + 600;
+      if (cmd === 'PING') handleLine('PONG,STM32_DORM_SAFETY');
+      else if (cmd.indexOf('STATUS') === 0) demoEmitStatus();
+      else if (cmd === 'DIAG') handleLine('DIAG,RX_OK=42,OVR=0,FE=0,UP=' + up + 's,STREAM=1');
+      else if (cmd === 'HISTORY') {
+        handleLine('HISTORY,COUNT=3');
+        handleLine('EVENT,INDEX=1,TYPE=OVERCURRENT,TIME=' + demoEventTime(60000));
+        handleLine('EVENT,INDEX=2,TYPE=OVERTEMP,TIME=' + demoEventTime(300000));
+        handleLine('EVENT,INDEX=3,TYPE=FORGOT LOAD,TIME=' + demoEventTime(600000));
+        handleLine('END_HISTORY');
+      }
+      else if (cmd === 'STREAM OFF') handleLine('OK,STREAM=OFF');
+      else if (cmd === 'STREAM ON') { handleLine('OK,STREAM=ON'); demoEmitStatus(); }
+      else if (cmd === 'MODE STUDY') { demoState.mode = 'STUDY'; handleLine('OK,MODE=STUDY'); demoEmitStatus(); }
+      else if (cmd === 'MODE SLEEP') { demoState.mode = 'SLEEP'; handleLine('OK,MODE=SLEEP'); demoEmitStatus(); }
+      else if (cmd === 'RELAY ON') { demoState.relay = 1; handleLine('OK,RELAY=1'); demoEmitStatus(); }
+      else if (cmd === 'RELAY OFF') { demoState.relay = 0; handleLine('OK,RELAY=0'); demoEmitStatus(); }
+      else if (cmd === 'CLEAR_ALARM') { demoState.alarm = 'NONE'; handleLine('OK,ALARM_CLEARED'); demoEmitStatus(); }
+      else if (cmd === 'CLEAR_HISTORY') { state.history = []; renderHistory(); handleLine('OK,HISTORY_CLEARED'); }
+      else handleLine('ERROR,UNKNOWN_COMMAND', 'err');
+    }, 120);
+  }
+
+  /* ---------------- 报警条件判断（决定要不要响） ---------------- */
+
+  /*
+   * 阈值只用于网页判断，不下发给板子。
+   * 默认值对应 main.c 里 DEMO_MODE=1 的那套参数；切成正式模式后
+   * 记得把超温改成 45、忘拔改成 1800，或者在“高级设置”里直接改。
+   */
+  var LIMITS = {
+    current: 1.5,     // 过流，A
+    temp: 30,         // 超温，℃
+    idlePower: 5.0,   // 忘拔：功率上限，W
+    idleStartPower: 0.50, // 与板子一致：避开空载 0~0.3 W 噪声
+    idleHoldPower: 0.35,  // 已开始计时的维持门槛，W
+    idleSeconds: 30   // 忘拔：持续多久算忘拔，秒
+  };
+
+  var idleSince = 0;                 // 低功率开始计时的时刻
+  var alarmUI = { type: null, lastBeep: 0, clearTimer: null };
+
+  function evaluateAlarm(i, p, t) {
+    var now = Date.now();
+
+    if (i > LIMITS.current) { idleSince = 0; return 'OVERCURRENT'; }
+    if (t >= LIMITS.temp)   { idleSince = 0; return 'OVER TEMP'; }
+
+    // 与板子相同的迟滞门槛，避免网页仍把空载漂移当作忘拔负载。
+    var idleFloor = idleSince ? LIMITS.idleHoldPower : LIMITS.idleStartPower;
+    if (p >= idleFloor && p <= LIMITS.idlePower) {
+      if (!idleSince) idleSince = now;
+      if (now - idleSince >= LIMITS.idleSeconds * 1000) return 'FORGOT LOAD';
+    } else {
+      idleSince = 0;
+    }
+    return null;
+  }
+
+  function refreshAlarmChip() {
+    if (alarmUI.type) {
+      chip('cAlarm', '告警', ALARM_CN[alarmUI.type] || alarmUI.type, 'bad');
+    } else if (state.currentAlarm && state.currentAlarm !== 'NONE') {
+      // 数值恢复了、但板子那边还锁存着，等 CLEAR_ALARM 才会清
+      chip('cAlarm', '告警', '已恢复', 'good');
+    } else {
+      chip('cAlarm', '告警', '无', 'good');
+    }
+  }
+
+  /*
+   * 条件成立 -> 立刻响，之后每 ALARM_REPEAT_MS 重复一次；
+   * 条件消失 -> 保持 ALARM_CLEAR_DELAY_MS 后自动停（防止数值抖动反复开关）。
+   */
+  function updateAlarmState(type) {
+    var now = Date.now();
+
+    if (type) {
+      if (alarmUI.clearTimer) {
+        clearTimeout(alarmUI.clearTimer);
+        alarmUI.clearTimer = null;
+      }
+      $('metrics').classList.add('alarming');
+
+      if (alarmUI.type !== type) {
+        alarmUI.type = type;
+        alarmUI.lastBeep = now;
+        alarmSound(type);
+      } else if (now - alarmUI.lastBeep >= ALARM_REPEAT_MS) {
+        alarmUI.lastBeep = now;
+        alarmSound(type);
+      }
+    } else {
+      if (alarmUI.type && !alarmUI.clearTimer) {
+        alarmUI.clearTimer = setTimeout(function () {
+          alarmUI.clearTimer = null;
+          alarmUI.type = null;
+          alarmUI.lastBeep = 0;
+          stopAllTones();
+          $('metrics').classList.remove('alarming');
+          refreshAlarmChip();
+        }, ALARM_CLEAR_DELAY_MS);
+      }
+    }
+    refreshAlarmChip();
+  }
+
+  /* ---------------- 报警提示音（Web Audio，不需要音频文件） ---------------- */
+
+  var ALARM_REPEAT_MS = 10000;       // 条件持续时，每 10 秒再响一次
+  var ALARM_CLEAR_DELAY_MS = 5000;   // 条件消失后，再响 5 秒才彻底停
+
+  function loadLimits() {
+    var keys = [['current', 'limCurrent'], ['temp', 'limTemp'], ['idlePower', 'limPower'], ['idleSeconds', 'limIdle']];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i][0], id = keys[i][1], v = null;
+      try { v = localStorage.getItem('hc08.lim.' + k); } catch (e) {}
+      if (v !== null && v !== '' && isFinite(parseFloat(v))) LIMITS[k] = parseFloat(v);
+      $(id).value = LIMITS[k];
+    }
+  }
+
+  function saveLimits() {
+    var keys = [['current', 'limCurrent'], ['temp', 'limTemp'], ['idlePower', 'limPower'], ['idleSeconds', 'limIdle']];
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i][0], el = $(keys[i][1]), v = parseFloat(el.value);
+      if (!isFinite(v) || v < 0) v = LIMITS[k];
+      LIMITS[k] = v;
+      el.value = v;
+      try { localStorage.setItem('hc08.lim.' + k, String(v)); } catch (e) {}
+    }
+    idleSince = 0;   // 阈值变了，忘拔计时重来
+  }
+
+  // 每种告警一个“指纹”：频点、单音时长、间隔、音色
+  var ALARM_PATTERN = {
+    'OVERCURRENT': { freqs: [880, 880, 880], dur: 0.10, gap: 0.09, gain: 0.13, type: 'square' },
+    'OVER TEMP':   { freqs: [520, 780],      dur: 0.28, gap: 0.05, gain: 0.11, type: 'sawtooth' },
+    'FORGOT LOAD': { freqs: [620, 620, 460], dur: 0.13, gap: 0.10, gain: 0.11, type: 'triangle' },
+    'POWER LOST':  { freqs: [300, 240],      dur: 0.35, gap: 0.06, gain: 0.13, type: 'sine' },
+    'POWER BACK':  { freqs: [560, 840],      dur: 0.14, gap: 0.06, gain: 0.09, type: 'sine' }
+  };
+
+  var alarmAudio = {
+    ctx: null,
+    enabled: true,
+    lastType: 'NONE',
+    lastAt: 0
+  };
+
+  /* 浏览器要求先有用户手势才能出声，所以音频上下文延迟到点击时创建 */
+  function audioUnlock() {
+    if (!alarmAudio.enabled) return;
+    try {
+      if (!alarmAudio.ctx) {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        alarmAudio.ctx = new AC();
+      }
+      if (alarmAudio.ctx.state === 'suspended') alarmAudio.ctx.resume();
+    } catch (e) { /* 忽略 */ }
+  }
+
+  var activeTones = [];
+
+  function tone(freq, at, dur, gain, type) {
+    var ctx = alarmAudio.ctx;
+    if (!ctx) return;
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = type || 'square';
+    o.frequency.setValueAtTime(freq, at);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(gain, at + 0.012);
+    g.gain.setValueAtTime(gain, at + Math.max(0.03, dur - 0.03));
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g);
+    g.connect(ctx.destination);
+
+    var item = { osc: o, gain: g };
+    activeTones.push(item);
+    o.onended = function () {
+      var i = activeTones.indexOf(item);
+      if (i >= 0) activeTones.splice(i, 1);
+    };
+
+    o.start(at);
+    o.stop(at + dur + 0.02);
+  }
+
+  /* 立刻掐掉正在响的报警（淡出 40 ms，避免爆音） */
+  function stopAllTones() {
+    var ctx = alarmAudio.ctx;
+    if (!ctx || !activeTones.length) {
+      activeTones = [];
+      return;
+    }
+    var now = ctx.currentTime;
+    for (var i = 0; i < activeTones.length; i++) {
+      var t = activeTones[i];
+      try {
+        t.gain.gain.cancelScheduledValues(now);
+        t.gain.gain.setValueAtTime(Math.max(t.gain.gain.value, 0.0001), now);
+        t.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+        t.osc.stop(now + 0.05);
+      } catch (e) { /* 已经停了就算了 */ }
+    }
+    activeTones = [];
+  }
+
+  function playAlarm(name) {
+    if (!alarmAudio.enabled) return;
+    audioUnlock();
+    var ctx = alarmAudio.ctx;
+    if (!ctx) return;
+    var p = ALARM_PATTERN[name] || ALARM_PATTERN.OVERCURRENT;
+    var t0 = ctx.currentTime + 0.02;
+    for (var i = 0; i < p.freqs.length; i++) {
+      tone(p.freqs[i], t0 + i * (p.dur + p.gap), p.dur, p.gain, p.type);
+    }
+  }
+
+  /* 同一次告警会被 EVENT 和 STATUS 各报一次，1.5 秒内只响一次 */
+  function alarmSound(name) {
+    if (!alarmAudio.enabled || !name || name === 'NONE') return;
+    var now = Date.now();
+    if (now - alarmAudio.lastAt < 1500) return;
+    alarmAudio.lastAt = now;
+    playAlarm(name);
+  }
+
+  function playBeepConfirm() {
+    if (!alarmAudio.enabled) return;
+    audioUnlock();
+    var ctx = alarmAudio.ctx;
+    if (!ctx) return;
+    var t0 = ctx.currentTime + 0.02;
+    tone(880, t0, 0.09, 0.09, 'sine');
+    tone(1180, t0 + 0.13, 0.11, 0.09, 'sine');
+  }
+
+  function updateSoundBtn() {
+    var b = $('btnSound');
+    b.textContent = alarmAudio.enabled ? '🔊 报警音' : '🔇 已静音';
+    b.style.color = alarmAudio.enabled ? '' : 'var(--muted)';
+  }
+
+  function loadSound() {
+    var v = '1';
+    try { v = localStorage.getItem('hc08.sound') || '1'; } catch (e) {}
+    alarmAudio.enabled = (v !== '0');
+    updateSoundBtn();
+  }
+
+  function saveSound() {
+    try { localStorage.setItem('hc08.sound', alarmAudio.enabled ? '1' : '0'); } catch (e) {}
+  }
+
+  /*
+   * 睡眠模式：关掉报警音（彻底关，之后任何告警都不响）。
+   * reason = 'device' 表示是板子上的物理按键切的，提示语不一样。
+   */
+  function acknowledgeAlarm(reason) {
+    stopAllTones();
+    if (!alarmAudio.enabled) return;      // 已经静音了，别重复弹提示
+    alarmAudio.enabled = false;
+    saveSound();
+    updateSoundBtn();
+    toast(reason === 'device'
+      ? '单片机已切到睡眠模式，报警音关闭'
+      : '报警音已关闭，切回日间模式或点右上角 🔇 可恢复');
+  }
+
+  /* 日间模式：保证报警音是开着的 */
+  function restoreAlarm(reason) {
+    if (alarmAudio.enabled) return;       // 本来就开着，什么都不用做
+    alarmAudio.enabled = true;
+    saveSound();
+    updateSoundBtn();
+    toast(reason === 'device'
+      ? '单片机已切回日间模式，报警音恢复'
+      : '已切到日间模式，报警音恢复');
+  }
+
+  /* ---------------- 事件绑定 ---------------- */
+
+  $('btnConnect').addEventListener('click', connect);
+  $('btnSerial').addEventListener('click', connectSerial);
+  $('btnDisconnect').addEventListener('click', function () {
+    if (state.demo) stopDemo(); else disconnect();
+  });
+  $('btnDemo').addEventListener('click', function () {
+    if (state.demo) stopDemo(); else startDemo();
+  });
+  $('btnSend').addEventListener('click', function () {
+    sendCmd($('cmdInput').value);
+    $('cmdInput').value = '';
+  });
+  $('cmdInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      sendCmd($('cmdInput').value);
+      $('cmdInput').value = '';
+    }
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-cmd]'), function (btn) {
+    btn.addEventListener('click', function () { sendCmd(btn.getAttribute('data-cmd')); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (btn) {
+    btn.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('#seg button'), function (b) {
+        b.classList.remove('active');
+      });
+      btn.classList.add('active');
+      state.seriesKey = btn.getAttribute('data-k');
+      drawChart();
+    });
+  });
+  $('btnClearLog').addEventListener('click', function () { $('log').innerHTML = ''; });
+  $('uuidService').addEventListener('change', saveUuids);
+  $('uuidChar').addEventListener('change', saveUuids);
+  $('autoReconnect').addEventListener('change', saveOptions);
+  $('filterName').addEventListener('change', saveOptions);
+  $('baudSel').addEventListener('change', saveBaud);
+  ['limCurrent', 'limTemp', 'limPower', 'limIdle'].forEach(function (id) {
+    $(id).addEventListener('change', saveLimits);
+  });
+  $('btnSound').addEventListener('click', function () {
+    alarmAudio.enabled = !alarmAudio.enabled;
+    saveSound();
+    updateSoundBtn();
+    if (alarmAudio.enabled) playBeepConfirm();
+    else toast('报警音已关闭');
+  });
+  document.addEventListener('pointerdown', audioUnlock, { once: true });
+
+  // 串口被拔掉/蓝牙设备被移除
+  if ('serial' in navigator) {
+    navigator.serial.addEventListener('disconnect', function () {
+      if (!state.port) return;
+      logLine('串口设备已移除', 'err');
+      state.reading = false;
+      state.port = null;
+      state.reader = null;
+      state.mode = null;
+      setConnectedUI(false);
+    });
+  }
+
+  // 每秒刷新“最后接收”
+  setInterval(function () {
+    if (!state.lastRx) return;
+    var age = Math.floor((Date.now() - state.lastRx) / 1000);
+    if (!state.connected && !state.demo) return;
+    var el = $('cLink');
+    el.className = 'chip' + (age > 20 ? ' bad' : ' good');
+    el.innerHTML = '最后接收 <b></b>';
+    el.querySelector('b').textContent = age <= 1 ? '刚刚' : age + ' 秒前';
+    if (age > SILENT_MS / 1000 && state.demo === false) {
+      el.className = 'chip bad';
+    }
+  }, 1000);
+
+  window.addEventListener('resize', drawChart);
+
+  /* ---------------- 启动 ---------------- */
+
+  loadUuids();
+  loadBaud();
+  loadSound();
+  loadLimits();
+  loadOptions();
+
+  if (!navigator.bluetooth) {
+    var b = $('banner');
+    b.style.display = 'block';
+    b.textContent = '⚠ 当前浏览器不支持 Web Bluetooth。请用电脑或安卓上的 Chrome / Edge 打开；iOS 的 Safari 不支持（可试 Bluefy）。' +
+      ' 另外页面需要跑在 https:// 或 localhost 下。';
+    $('btnConnect').disabled = true;
+  }
+
+  if (!('serial' in navigator)) {
+    $('btnSerial').disabled = true;
+  }
+
+  drawChart();
+  logLine('页面就绪。点「连接设备」选择 HC-08，或先点「演示模式」预览界面。', 'sys');
+
+  // 方便截图/演示：index.html?demo=1 自动进入演示模式
+  if (/[?&]demo=1\b/.test(location.search)) startDemo();
+})();
+</script>
+</body>
+</html>
